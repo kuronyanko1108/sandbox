@@ -3,6 +3,10 @@ from decimal import Decimal
 
 FOUR_ARITHMETIC_OPERATIONS = {"+", "-", "*", "/"}
 ZERO = "0"
+LEFT_PARENTHESIS = "("
+RIGHT_PARENTHESIS = ")"
+DECIMAL_POINT = "."
+MINUS = "-"
 
 
 class Application(tk.Frame):
@@ -86,7 +90,7 @@ class Application(tk.Frame):
                 row_idx += 1
                 col_idx = 0
 
-    # ボタン押下時
+    # ボタン押下時の処理
     def on_click(self, key):
         prev_value = self.input_values[-1]
 
@@ -100,37 +104,80 @@ class Application(tk.Frame):
             self.input_values.append(ZERO)
             self.output_value = "".join(self.input_values)
 
+        # 入力キーが数字
         elif key.isdigit():
-            if self.input_values[0] == ZERO and len(self.input_values) == 1:
+            if prev_value == ZERO and len(self.input_values) == 1:
                 self.input_values.pop()
-            elif prev_value.isdigit() or "." in prev_value:
+
+            elif RIGHT_PARENTHESIS in prev_value and LEFT_PARENTHESIS in prev_value:
+                prev_num = self.input_values.pop()
+                key = (
+                    LEFT_PARENTHESIS
+                    + self.strip_parentheses(prev_num)
+                    + key
+                    + RIGHT_PARENTHESIS
+                )
+
+            elif prev_value.isdigit() or DECIMAL_POINT in prev_value:
                 prev_num = self.input_values.pop()
                 key = prev_num + key
+
             self.input_values.append(key)
             self.output_value = "".join(self.input_values)
 
+        # 入力キーが四則演算子
         elif key in FOUR_ARITHMETIC_OPERATIONS:
             if prev_value in FOUR_ARITHMETIC_OPERATIONS:
                 self.input_values.pop()
-            elif prev_value[-1] == ".":
+            elif prev_value[-1] == DECIMAL_POINT:
                 self.input_values.pop()
-                self.input_values.append(prev_value.rstrip("."))
+                self.input_values.append(prev_value.rstrip(DECIMAL_POINT))
             self.input_values.append(key)
             self.output_value = "".join(self.input_values)
 
-        elif key == ".":
+        # 入力キーが小数点
+        elif key == DECIMAL_POINT:
+            if DECIMAL_POINT in prev_value:
+                return
+
             if prev_value in FOUR_ARITHMETIC_OPERATIONS:
                 key = ZERO + key
             elif prev_value.isdigit():
                 prev_num = self.input_values.pop()
                 key = prev_num + key
-            elif "." in prev_value:
-                return
+            elif RIGHT_PARENTHESIS in prev_value and LEFT_PARENTHESIS in prev_value:
+                prev_num = self.input_values.pop()
+                key = (
+                    LEFT_PARENTHESIS
+                    + self.strip_parentheses(prev_num)
+                    + key
+                    + RIGHT_PARENTHESIS
+                )
             self.input_values.append(key)
             self.output_value = "".join(self.input_values)
 
+        # 入力キーが +/-
+        elif key == "+/-":
+            if prev_value in FOUR_ARITHMETIC_OPERATIONS:
+                return
+            else:
+                self.input_values.pop()
+                self.input_values.append(self.convert_sign_format(prev_value))
+                self.output_value = "".join(self.input_values)
+
         print(self.input_values)
         self.result_var.set(self.output_value)
+
+    # 正負入れ替え処理
+    def convert_sign_format(self, number):
+        if MINUS in number:
+            return self.strip_parentheses(number).strip(MINUS)
+        else:
+            return LEFT_PARENTHESIS + MINUS + number + RIGHT_PARENTHESIS
+
+    # 括弧の処理を外す処理
+    def strip_parentheses(self, value):
+        return value.strip(RIGHT_PARENTHESIS).strip(LEFT_PARENTHESIS)
 
     # 小数点.0のときの小数点以下の０を削除
     def trim_trailing_zeros(self, val):
@@ -171,6 +218,8 @@ class Application(tk.Frame):
         operators = []
 
         for e in expression:
+            if RIGHT_PARENTHESIS in e and LEFT_PARENTHESIS in e:
+                e = self.strip_parentheses(e)
 
             if e.isdigit() or any(v.isdigit() for v in e):
                 postfix.append(e)
@@ -197,10 +246,8 @@ class Application(tk.Frame):
 
 root = tk.Tk()
 root.title("tkinter-calculator")
-root.geometry("500x300")
+root.geometry("200x230")
 
 app = Application(root=root)
-d = Decimal(10.1)
-print(d.to_integral_value())
 
 app.mainloop()
