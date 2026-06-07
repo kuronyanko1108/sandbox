@@ -1,5 +1,6 @@
 import tkinter as tk
 from decimal import Decimal
+import re
 
 FOUR_ARITHMETIC_OPERATIONS = {"+", "-", "*", "/"}
 ZERO = "0"
@@ -7,6 +8,8 @@ LEFT_PARENTHESIS = "("
 RIGHT_PARENTHESIS = ")"
 DECIMAL_POINT = "."
 MINUS = "-"
+PERCENT = "%"
+DECIMAL_PERCENT = Decimal("0.01")
 
 
 class Application(tk.Frame):
@@ -65,12 +68,12 @@ class Application(tk.Frame):
         col_idx = 0
 
         for key in calc_keys:
-            self.num_btn = tk.Button(self)
-            self.num_btn["command"] = lambda k=key: self.on_click(k)
-            self.num_btn["text"] = key
+            self.key_button = tk.Button(self)
+            self.key_button["command"] = lambda k=key: self.on_click(k)
+            self.key_button["text"] = key
 
             if key == "0":
-                self.num_btn.grid(
+                self.key_button.grid(
                     row=row_idx,
                     column=col_idx,
                     padx=1,
@@ -81,7 +84,7 @@ class Application(tk.Frame):
                 col_idx += 2
 
             else:
-                self.num_btn.grid(
+                self.key_button.grid(
                     row=row_idx, column=col_idx, padx=1, pady=1, sticky="nsew"
                 )
                 col_idx += 1
@@ -113,7 +116,7 @@ class Application(tk.Frame):
                 prev_num = self.input_values.pop()
                 key = (
                     LEFT_PARENTHESIS
-                    + self.strip_parentheses(prev_num)
+                    + self.replace_parentheses(prev_num)
                     + key
                     + RIGHT_PARENTHESIS
                 )
@@ -121,6 +124,9 @@ class Application(tk.Frame):
             elif prev_value.isdigit() or DECIMAL_POINT in prev_value:
                 prev_num = self.input_values.pop()
                 key = prev_num + key
+
+            elif prev_value[-1] == PERCENT:
+                return
 
             self.input_values.append(key)
             self.output_value = "".join(self.input_values)
@@ -142,23 +148,53 @@ class Application(tk.Frame):
 
             if prev_value in FOUR_ARITHMETIC_OPERATIONS:
                 key = ZERO + key
+
             elif prev_value.isdigit():
                 prev_num = self.input_values.pop()
                 key = prev_num + key
+
             elif RIGHT_PARENTHESIS in prev_value and LEFT_PARENTHESIS in prev_value:
                 prev_num = self.input_values.pop()
                 key = (
                     LEFT_PARENTHESIS
-                    + self.strip_parentheses(prev_num)
+                    + self.replace_parentheses(prev_num)
                     + key
                     + RIGHT_PARENTHESIS
                 )
+
+            self.input_values.append(key)
+            self.output_value = "".join(self.input_values)
+
+        # 入力キーが ％
+        elif key == PERCENT:
+            if PERCENT in prev_value:
+                prev_num = self.input_values.pop()
+                key = LEFT_PARENTHESIS + prev_num + RIGHT_PARENTHESIS + key
+
+            elif prev_value.isdigit() or DECIMAL_POINT in prev_value:
+                prev_num = self.input_values.pop()
+                key = prev_num + key
+
+            elif RIGHT_PARENTHESIS in prev_value and LEFT_PARENTHESIS in prev_value:
+                prev_num = self.input_values.pop()
+                key = prev_num + key
+
+            elif prev_value in FOUR_ARITHMETIC_OPERATIONS:
+                self.input_values.pop()
+                prev_num = self.input_values.pop()
+                if PERCENT in prev_num:
+                    key = LEFT_PARENTHESIS + prev_num + RIGHT_PARENTHESIS + key
+                else:
+                    key = prev_num + key
+
             self.input_values.append(key)
             self.output_value = "".join(self.input_values)
 
         # 入力キーが +/-
         elif key == "+/-":
             if prev_value in FOUR_ARITHMETIC_OPERATIONS:
+                return
+            elif prev_value == ZERO and len(self.input_values) == 1:
                 return
             else:
                 self.input_values.pop()
@@ -171,13 +207,14 @@ class Application(tk.Frame):
     # 正負入れ替え処理
     def convert_sign_format(self, number):
         if MINUS in number:
-            return self.strip_parentheses(number).strip(MINUS)
+            return self.replace_parentheses(number).strip(MINUS)
         else:
             return LEFT_PARENTHESIS + MINUS + number + RIGHT_PARENTHESIS
 
     # 括弧の処理を外す処理
-    def strip_parentheses(self, value):
-        return value.strip(RIGHT_PARENTHESIS).strip(LEFT_PARENTHESIS)
+    def replace_parentheses(self, value):
+
+        return value.replace(RIGHT_PARENTHESIS, "").replace(LEFT_PARENTHESIS, "")
 
     # 小数点.0のときの小数点以下の０を削除
     def trim_trailing_zeros(self, val):
@@ -210,7 +247,16 @@ class Application(tk.Frame):
                 numbers.append(n)
 
         ans = numbers.pop()
+
         return ans
+
+    def calc_percent(self, value):
+        percent_count = value.count(PERCENT)
+        # 小数点の時の許容がない
+        strip_percent_number = value.strip(PERCENT)
+
+        ans = Decimal(strip_percent_number) * Decimal(DECIMAL_PERCENT**percent_count)
+        return str(ans)
 
     # 中置記法を逆ポーランド記法に変換
     def convert_infix_to_postfix(self, expression):
@@ -219,7 +265,10 @@ class Application(tk.Frame):
 
         for e in expression:
             if RIGHT_PARENTHESIS in e and LEFT_PARENTHESIS in e:
-                e = self.strip_parentheses(e)
+                e = self.replace_parentheses(e)
+
+            if PERCENT in e:
+                e = self.calc_percent(e)
 
             if e.isdigit() or any(v.isdigit() for v in e):
                 postfix.append(e)
