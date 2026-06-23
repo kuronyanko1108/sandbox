@@ -36,5 +36,5 @@ cards = search_cards("tag:コンピュータ構成要素")
 print(cards)
 
 
-result = add_note("日本語", "りんご", "apple", ["食べ物", "果物"])
+result = add_note("日本語", "ばなな", "banana", ["食べ物", "果物"])
 print(result)
